@@ -3,6 +3,8 @@ package io.lightine.tessera.mrz.camera
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.util.Size
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
@@ -10,6 +12,10 @@ import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.core.SurfaceRequest
 import androidx.camera.core.UseCase
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.core.ViewPort
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
@@ -120,6 +126,12 @@ public class CameraXMrzScanner(
     // analysis use case and its SurfaceRequest is published on [surfaceRequest] for a viewfinder to draw.
     // @Volatile because enablePreview() may be called from any thread; the bind reads it on Dispatchers.Main.
     @Volatile private var previewEnabled = false
+
+    // Optional viewport for preview↔analysis WYSIWYG: when set (with preview armed), the two use cases bind
+    // in a UseCaseGroup with this ViewPort, so CameraX crops both to the SAME sensor region — what the
+    // viewfinder shows is what the analyzer sees. Without it, CameraX may give the two different crops, so a
+    // region-of-interest on the analysis frame would not match the on-screen guide. Set via [enablePreview].
+    @Volatile private var previewViewport: ViewPort? = null
     private val mutableSurfaceRequest = MutableStateFlow<SurfaceRequest?>(null)
 
     /**
@@ -137,10 +149,51 @@ public class CameraXMrzScanner(
      * remains headless (ADR-020) — a pure-OCR consumer never pays for a Preview use case. Idempotent; call
      * before [start]. There is no disarm: preview stays on for this scanner's lifetime once armed (the
      * default UI arms once at construction).
+     *
+     * @param viewport optional preview↔analysis **WYSIWYG** viewport. When supplied, the preview and analysis
+     *   use cases bind in a [UseCaseGroup] with this [ViewPort], so CameraX crops both to the **same** sensor
+     *   region — the region the viewfinder shows is the region the analyzer receives. Build it from the
+     *   viewfinder's on-screen size and display rotation (`ViewPort.Builder(Rational(w, h), rotation)`). This
+     *   is what makes a region-of-interest crop (e.g. the MRZ band) line up with the on-screen framing guide.
+     *   `null` (the default) keeps the prior behaviour — the two use cases bind independently, and their crop
+     *   rects are not guaranteed to match.
      */
-    public fun enablePreview() {
+    public fun enablePreview(viewport: ViewPort? = null) {
         previewEnabled = true
+        previewViewport = viewport
     }
+
+    // Torch control for the default UI's torch button. The desired state is held here and applied to the bound
+    // CameraX [Camera] when the session binds and on every toggle. @Volatile because [setTorchEnabled] may be
+    // called from the UI thread while [boundCamera] is assigned on the bind thread. `enableTorch` is a CameraX
+    // async control that does not rebind the session, so toggling never interrupts capture.
+    @Volatile private var torchEnabled = false
+
+    @Volatile private var boundCamera: Camera? = null
+
+    /**
+     * Turns the active camera's torch on or off. Safe to call before [start] (applied when the camera binds)
+     * or while running; a no-op on a camera with no flash unit. The torch turns off when the session unbinds.
+     */
+    public fun setTorchEnabled(enabled: Boolean) {
+        torchEnabled = enabled
+        boundCamera?.let { if (it.cameraInfo.hasFlashUnit()) it.cameraControl.enableTorch(enabled) }
+    }
+
+    /** Whether the active camera has a flash unit (torch). `false` until the camera has bound at least once. */
+    public fun hasTorch(): Boolean = boundCamera?.cameraInfo?.hasFlashUnit() == true
+
+    // Autofocus is intentionally left to CameraX's default continuous mode (CONTROL_AF_MODE_CONTINUOUS_PICTURE):
+    // it keeps re-focusing on the scene as a handheld document moves, which is what an MRZ scan needs. An earlier
+    // pass aimed a one-shot FocusMeteringAction at the MRZ band and held it with disableAutoCancel() — but a
+    // one-shot lock is the wrong shape here: it fixes focus on the FIRST frame and never tracks, so a document
+    // brought in too close (inside the lens minimum focus distance, ~10 cm on a typical main camera) stays soft
+    // even after the user pulls back into the focusable range. Device profiling (TES-86, Galaxy S24) confirmed the
+    // one-shot AF actually converged (isFocusSuccessful=true) yet the image was still blurred — the classic
+    // signature of shooting nearer than the lens can focus, not an AF failure. Continuous AF tracks the pull-back;
+    // the WYSIWYG viewport already centres the analysis frame on the guide box, so the default full-frame metering
+    // is effectively band-weighted without a per-frame metering call. Framing guidance (the struggling hint) steers
+    // the user out of the too-close range instead.
 
     // Tracks the in-flight session and auto-clears it on completion, so start() works again after the
     // stream ends on its own (a terminal CaptureError), not only after stop(). See CameraSessionGate.
@@ -187,7 +240,23 @@ public class CameraXMrzScanner(
             val analysis =
                 ImageAnalysis
                     .Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    // Analyse above CameraX's ~640x480 default: the MRZ's small fixed-pitch glyphs need enough
+                    // pixels for the OCR engine to read them reliably — at the default a 30-char line is
+                    // ~16 px/char and ML Kit confused the filler `<` with `«`, failing the parse (TES-86).
+                    // 1280x960 keeps the 4:3 aspect (so the analysis FOV — and the MRZ band crop — still line
+                    // up with the preview) while quadrupling the pixels (~32 px/char); fall back to the closest
+                    // the device supports. `setResolutionSelector` is the current API (`setTargetResolution` is
+                    // deprecated in camera-core 1.6.x).
+                    .setResolutionSelector(
+                        ResolutionSelector
+                            .Builder()
+                            .setResolutionStrategy(
+                                ResolutionStrategy(
+                                    Size(1280, 960),
+                                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                                ),
+                            ).build(),
+                    ).setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
             analysis.setAnalyzer(analysisExecutor) { proxy ->
                 // Hand the frame to the collector; if it is not ready, drop and close this frame here (a
@@ -212,13 +281,32 @@ public class CameraXMrzScanner(
 
             val camera =
                 try {
-                    provider.bindToLifecycle(lifecycleOwner, cameraSelector, *useCases.toTypedArray())
+                    // With a viewport (and a preview to align to), bind preview + analysis in a UseCaseGroup so
+                    // CameraX crops BOTH to the same sensor region (WYSIWYG) — this is what lets a
+                    // region-of-interest on the analysis frame line up with the on-screen framing guide.
+                    // Otherwise bind the use cases directly (headless, or no viewport), preserving prior behaviour.
+                    val viewport = previewViewport
+                    if (preview != null && viewport != null) {
+                        val group =
+                            UseCaseGroup
+                                .Builder()
+                                .setViewPort(viewport)
+                                .addUseCase(preview)
+                                .addUseCase(analysis)
+                                .build()
+                        provider.bindToLifecycle(lifecycleOwner, cameraSelector, group)
+                    } else {
+                        provider.bindToLifecycle(lifecycleOwner, cameraSelector, *useCases.toTypedArray())
+                    }
                 } catch (failure: Exception) {
                     analysis.clearAnalyzer()
                     mutableSurfaceRequest.value = null
                     close(failure)
                     return@callbackFlow
                 }
+            // Hold the camera for torch control and apply the desired torch state (honours torchOnByDefault).
+            boundCamera = camera
+            if (camera.cameraInfo.hasFlashUnit()) camera.cameraControl.enableTorch(torchEnabled)
 
             // CameraX surfaces a failed camera open (permission denied, camera in use, hardware fault)
             // asynchronously through camera STATE, not as a bind-time exception. How we surface it follows
@@ -263,6 +351,7 @@ public class CameraXMrzScanner(
             camera.cameraInfo.cameraState.observe(lifecycleOwner, stateObserver)
 
             awaitClose {
+                boundCamera = null
                 camera.cameraInfo.cameraState.removeObserver(stateObserver)
                 analysis.clearAnalyzer()
                 // Clear the published request first: the viewfinder stops drawing before we unbind, and a

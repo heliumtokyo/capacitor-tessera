@@ -78,6 +78,25 @@ class MrzFrameAnalyzerTest {
         }
 
     @Test
+    fun recovers_ocr_chevron_glyphs_to_the_filler_and_still_decodes() =
+        runTest {
+            // OCR sometimes reads the MRZ filler `<` as the out-of-alphabet chevron `«` (device-observed with
+            // ML Kit on a real ID). The analyzer recovers `«`→`<` — glyph recovery, like folding case to upper,
+            // since `«` is never a valid MRZ character — so the frame still decodes; the RAW recognized text
+            // keeps the original `«` verbatim (Principle 5 — we normalize only the parse candidate, never what
+            // we report we read).
+            val ocrLine1 = td3Line1.replace('<', '«') // every filler misread as a chevron
+            val ocrLine2 = td3Line2.replace('<', '«')
+
+            val decoded = assertIs<MrzScanResult.Decoded>(analyzer(recognizerReturning(textOf(ocrLine1, ocrLine2))).analyse(FakeFrame()))
+
+            // Recovered `«`→`<`, so it parses exactly like the clean Utopia specimen.
+            assertIs<ParseResult.Success>(decoded.parse)
+            // The raw OCR text is preserved with the chevrons intact — transparency, not silent correction.
+            assertEquals(listOf(ocrLine1, ocrLine2), decoded.recognizedText.lines.map { it.text })
+        }
+
+    @Test
     fun ignores_surrounding_visual_zone_text() =
         runTest {
             // Real OCR returns the printed name/country lines above the MRZ; only the two 44-char
@@ -87,6 +106,21 @@ class MrzFrameAnalyzerTest {
             val decoded = assertIs<MrzScanResult.Decoded>(analyzer(recognizer).analyse(FakeFrame()))
             assertIs<ParseResult.Success>(decoded.parse)
             assertEquals(4, decoded.quality.recognizedLineCount)
+        }
+
+    @Test
+    fun finds_the_mrz_despite_an_adjacent_same_width_printed_line() =
+        runTest {
+            // A printed line the SAME width as a TD3 line (44) sits directly against the zone — the exact
+            // shape the old whole-run matcher choked on (it lumped the neighbour in, making a 3×44 "run" that
+            // is not a shape). The neighbour carries a comma, so it is not MRZ-alphabet; the window search
+            // skips it and locks onto the real 2×44 pair. Device-observed noise (blood group / place of birth
+            // lines abut the MRZ on real cards).
+            val printedNeighbour = td3Line1.dropLast(1) + "," // 44 chars, but a comma → not MRZ-alphabet
+            val recognizer = recognizerReturning(textOf(printedNeighbour, td3Line1, td3Line2))
+
+            val decoded = assertIs<MrzScanResult.Decoded>(analyzer(recognizer).analyse(FakeFrame()))
+            assertIs<ParseResult.Success>(decoded.parse)
         }
 
     @Test
