@@ -42,9 +42,21 @@ android.builtInKotlin=false
 android.newDsl=false
 ```
 
-The plugin applies Kotlin 2.4 itself. The example preparation script adds both
-properties automatically. This compatibility override can be removed once AGP's
-built-in compiler can consume Kotlin 2.4 metadata.
+The host buildscript must also put Kotlin Gradle and Compose compiler plugins 2.4.10
+on its classpath before the adapter is configured:
+
+```groovy
+buildscript {
+    dependencies {
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10'
+        classpath 'org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.4.10'
+    }
+}
+```
+
+The adapter applies Kotlin 2.4 to its module. The example preparation script adds the
+classpath entries and both properties automatically. This compatibility override can
+be removed once AGP's built-in compiler can consume Kotlin 2.4 metadata.
 
 On Android, the adapter requests camera permission through Capacitor, presents
 Tessera's Compose scanner in a private activity, prevents concurrent sessions, and

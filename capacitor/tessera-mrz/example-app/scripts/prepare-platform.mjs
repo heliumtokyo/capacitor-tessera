@@ -18,8 +18,8 @@ run('cap', 'sync', platform);
 if (platform === 'android') {
   replaceInFile(
     'android/build.gradle',
-    /com\.android\.tools\.build:gradle:[\d.]+/,
-    'com.android.tools.build:gradle:9.2.1',
+    /classpath 'com\.android\.tools\.build:gradle:[\d.]+'(?:\n\s*classpath 'org\.jetbrains\.kotlin:kotlin-gradle-plugin:[\d.]+')?(?:\n\s*classpath 'org\.jetbrains\.kotlin:compose-compiler-gradle-plugin:[\d.]+')?/,
+    "classpath 'com.android.tools.build:gradle:9.2.1'\n        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10'\n        classpath 'org.jetbrains.kotlin:compose-compiler-gradle-plugin:2.4.10'",
   );
   setGradleProperty(
     'android/gradle/wrapper/gradle-wrapper.properties',
