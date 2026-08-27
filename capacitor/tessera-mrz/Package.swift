@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CapacitorTesseraMrz",
-    platforms: [.iOS(.v18)],
+    platforms: [.iOS("18.0")],
     products: [
         .library(
             name: "CapacitorTesseraMrz",

@@ -13,6 +13,8 @@ if (!existsSync(platform)) {
   run('cap', 'add', platform);
 }
 
+run('cap', 'sync', platform);
+
 if (platform === 'android') {
   replaceInFile('android/variables.gradle', /compileSdkVersion\s*=\s*\d+/, 'compileSdkVersion = 37');
   replaceInFile('android/variables.gradle', /targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 37');
@@ -22,7 +24,7 @@ if (platform === 'android') {
     /IPHONEOS_DEPLOYMENT_TARGET = [\d.]+;/g,
     'IPHONEOS_DEPLOYMENT_TARGET = 18.0;',
   );
-  replaceInFile('ios/App/CapApp-SPM/Package.swift', /\.iOS\(\.v\d+\)/, '.iOS(.v18)');
+  replaceInFile('ios/App/CapApp-SPM/Package.swift', /\.iOS\((?:\.v\d+|["'][\d.]+["'])\)/, '.iOS("18.0")');
 
   const infoPlistPath = 'ios/App/App/Info.plist';
   const infoPlist = readFileSync(infoPlistPath, 'utf8');
@@ -39,8 +41,6 @@ if (platform === 'android') {
     );
   }
 }
-
-run('cap', 'sync', platform);
 
 function replaceInFile(path, pattern, replacement) {
   const original = readFileSync(path, 'utf8');
