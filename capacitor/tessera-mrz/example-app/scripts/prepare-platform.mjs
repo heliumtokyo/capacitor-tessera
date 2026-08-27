@@ -31,6 +31,11 @@ if (platform === 'android') {
     'distributionSha256Sum',
     '9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14',
   );
+  replaceInFile(
+    'android/app/build.gradle',
+    /getDefaultProguardFile\('proguard-android(?:-optimize)?\.txt'\)/,
+    "getDefaultProguardFile('proguard-android-optimize.txt')",
+  );
   replaceInFile('android/variables.gradle', /compileSdkVersion\s*=\s*\d+/, 'compileSdkVersion = 37');
   replaceInFile('android/variables.gradle', /targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 37');
 } else {

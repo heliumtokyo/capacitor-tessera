@@ -44,6 +44,26 @@ final class MrzResultMapperTests: XCTestCase {
         )
     }
 
+    func testMapsDocumentNumberFailureField() {
+        var lines = specimen.split(separator: "\n").map(String.init)
+        var secondLine = Array(lines[1])
+        secondLine[9] = "7"
+        lines[1] = String(secondLine)
+        let parse = MrzParser.shared.parseTD3(
+            input: lines.joined(separator: "\n"),
+            referenceTime: referenceTime
+        )
+
+        let mapped = MrzResultMapper.map(parse)
+
+        XCTAssertEqual(mapped?.validation.documentNumberCheckDigit, false)
+        XCTAssertTrue(
+            mapped?.validationFailures.contains {
+                $0.code == "MrzCheckDigitMismatch" && $0.field == "document-number"
+            } == true
+        )
+    }
+
     func testReturnsNoBridgeResultForStructuralFailure() {
         let parse = MrzParser.shared.parse(input: "not-an-mrz", referenceTime: referenceTime)
 

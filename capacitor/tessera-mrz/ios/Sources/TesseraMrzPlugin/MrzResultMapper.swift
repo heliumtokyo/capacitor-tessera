@@ -176,8 +176,14 @@ enum MrzResultMapper {
             field = nil
         }
         let className = NSStringFromClass(type(of: failure)).split(separator: ".").last.map(String.init)
+        let code: String
+        if let className, className.hasPrefix("Tessera") {
+            code = String(className.dropFirst("Tessera".count))
+        } else {
+            code = className ?? "MrzValidationError"
+        }
         return MappedValidationFailure(
-            code: className ?? "MrzValidationError",
+            code: code,
             field: field.map(fieldName)
         )
     }
