@@ -1,0 +1,26 @@
+{
+  "name": "capacitor-tessera-mrz-example",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "native:android": "npm run build && node scripts/prepare-platform.mjs android",
+    "native:ios": "npm run build && node scripts/prepare-platform.mjs ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/ios": "8.5.0",
+    "capacitor-tessera-mrz": "file:.."
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.0",
+    "vite": "8.2.2"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

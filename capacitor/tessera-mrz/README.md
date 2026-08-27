@@ -44,6 +44,22 @@ published Tessera Swift package at 0.5.0 so Android and iOS share a known native
 compatibility baseline. CocoaPods is not advertised because the native Tessera UI is
 distributed through Swift Package Manager.
 
+## Example app
+
+The validation app in `example-app` shows support metadata, starts a passport scan,
+cancels an active scan, and renders the latest result without storing or uploading it.
+Generated Android and iOS projects stay out of git; its preparation scripts recreate
+them and apply the plugin's documented native platform floors.
+
+```sh
+cd example-app
+npm ci
+npm run native:android
+# or: npm run native:ios
+```
+
+Open the generated native project with the platform's supported development driver.
+
 ## Data boundary
 
 Camera frames stay in the native scanner. The plugin returns normalized document
