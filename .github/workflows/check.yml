@@ -20,6 +20,9 @@
 #   commonMain/iosMain code (the core modules' iOS targets and, from the iOS camera
 #   slice, the AVFoundation/Vision code) that the Linux jobs cannot. Device/live-camera
 #   runs are local/manual; the Simulator has no camera.
+# - The three `capacitor-*` jobs verify the fork-only adapter without changing the
+#   upstream Gradle graph: TypeScript contract tests and package assembly on Linux,
+#   plus generated Android and iOS host builds and their native mapper tests.
 # - JS / Wasm remain per-release-activated per docs/scope.md "Supported Platforms".
 # - JDK 21 to match each module's jvmToolchain(21); the Gradle daemon is pinned to
 #   JDK 17 (gradle/gradle-daemon-jvm.properties, foojay-provisioned).
@@ -226,6 +229,130 @@ jobs:
       # iOS targets). The JVM `check` job covers the JVM-bearing modules' common ABI baselines.
       - name: Compile iOS targets, run simulator tests, assemble the XCFramework, check iOS ABI
         run: ./gradlew iosSimulatorArm64Test compileKotlinIosArm64 :mrz-camera-ios:assembleTesseraDebugXCFramework :mrz-camera-ios:checkKotlinAbi
+
+  capacitor-web:
+    name: Capacitor adapter · web contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            capacitor/tessera-mrz/package-lock.json
+            capacitor/tessera-mrz/example-app/package-lock.json
+
+      - name: Verify and assemble plugin package
+        working-directory: capacitor/tessera-mrz
+        run: |
+          npm ci
+          npm run verify
+          npm pack --dry-run
+
+      - name: Audit production dependencies and generate SBOM
+        working-directory: capacitor/tessera-mrz
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm sbom --sbom-format=cyclonedx > "$RUNNER_TEMP/capacitor-tessera-mrz.cdx.json"
+
+      - name: Scan tracked content
+        run: bash scripts/private-content-scan.sh
+
+      - name: Build example web app
+        working-directory: capacitor/tessera-mrz/example-app
+        run: |
+          npm ci
+          npm run build
+
+  capacitor-android:
+    name: Capacitor adapter · Android host
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            capacitor/tessera-mrz/package-lock.json
+            capacitor/tessera-mrz/example-app/package-lock.json
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Ensure Android SDK platform 37
+        run: |
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -d "$ANDROID_SDK_ROOT/platforms/android-37.0" ]; then
+            yes 2>/dev/null | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+            "$SDKMANAGER" --install "platforms;android-37.0"
+          fi
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Build plugin JavaScript
+        working-directory: capacitor/tessera-mrz
+        run: |
+          npm ci
+          npm run build
+
+      - name: Generate and compile Android host
+        working-directory: capacitor/tessera-mrz/example-app
+        run: |
+          npm ci
+          npm run native:android
+          cd android
+          ./gradlew assembleDebug testDebugUnitTest
+
+  capacitor-ios:
+    name: Capacitor adapter · iOS host
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            capacitor/tessera-mrz/package-lock.json
+            capacitor/tessera-mrz/example-app/package-lock.json
+
+      - name: Build plugin JavaScript
+        working-directory: capacitor/tessera-mrz
+        run: |
+          npm ci
+          npm run build
+
+      - name: Generate iOS host
+        working-directory: capacitor/tessera-mrz/example-app
+        run: |
+          npm ci
+          npm run native:ios
+
+      - name: Build and test Swift package
+        working-directory: capacitor/tessera-mrz
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json, sys; data=json.load(sys.stdin)["devices"]; print(next(device["udid"] for runtime in sorted(data, reverse=True) for device in data[runtime] if device["name"].startswith("iPhone")))')
+          xcodebuild -scheme CapacitorTesseraMrz -destination "platform=iOS Simulator,id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO test
+
+      - name: Compile generated iOS host
+        run: xcodebuild -project capacitor/tessera-mrz/example-app/ios/App/App.xcodeproj -scheme App -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 
   # The enforcement hooks in .claude/settings.json are code and regress like code
   # (known-pitfalls: "the hook itself needs regression tests"). Their test scripts are

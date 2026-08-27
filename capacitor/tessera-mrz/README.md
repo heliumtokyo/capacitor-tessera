@@ -60,6 +60,22 @@ npm run native:android
 
 Open the generated native project with the platform's supported development driver.
 
+## Platform parity
+
+| Behavior | Android | iOS |
+|---|---|---|
+| TD1, TD2, TD3, MRV-A, and MRV-B mapping | Yes | Yes |
+| Cancel, camera denial, timeout, and one active scan | Yes | Yes |
+| Optional partial results and document-family filtering | Yes | Yes |
+| Raw MRZ lines and check-digit observations | Yes | Yes |
+| Normalized names, dates, nationality, issuer, and document number | Yes | Yes |
+| Back camera and initial torch option | Yes | Yes |
+
+Dates are returned as `YYYY-MM-DD` when Tessera can resolve the MRZ's two-digit year,
+or `null` when it cannot do so honestly. Both platforms reject a front-camera request
+with `UNSUPPORTED_OPTION` because Tessera 0.5.0's default scanner UI exposes only the
+back camera.
+
 ## Data boundary
 
 Camera frames stay in the native scanner. The plugin returns normalized document
