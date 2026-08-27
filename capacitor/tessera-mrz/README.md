@@ -38,6 +38,12 @@ maps Tessera `Success` and `PartialSuccess` values into the TypeScript DTO. Tess
 0.5.0 only exposes the back camera through its default UI, so requesting `front`
 rejects with `UNSUPPORTED_OPTION` instead of silently ignoring the option.
 
+On iOS, the adapter requests AVFoundation camera authorization and presents
+TesseraUI's scanner from a full-screen `UIHostingController`. The package pins the
+published Tessera Swift package at 0.5.0 so Android and iOS share a known native
+compatibility baseline. CocoaPods is not advertised because the native Tessera UI is
+distributed through Swift Package Manager.
+
 ## Data boundary
 
 Camera frames stay in the native scanner. The plugin returns normalized document
