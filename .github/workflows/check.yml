@@ -345,14 +345,17 @@ jobs:
           npm ci
           npm run native:ios
 
-      - name: Build and test Swift package
-        working-directory: capacitor/tessera-mrz
+      - name: Select arm64 iOS simulator
         run: |
           DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c 'import json, sys; data=json.load(sys.stdin)["devices"]; print(next(device["udid"] for runtime in sorted(data, reverse=True) for device in data[runtime] if device["name"].startswith("iPhone")))')
-          xcodebuild -scheme CapacitorTesseraMrz -destination "platform=iOS Simulator,id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO test
+          echo "DEVICE_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+
+      - name: Build and test Swift package
+        working-directory: capacitor/tessera-mrz
+        run: xcodebuild -scheme CapacitorTesseraMrz -destination "platform=iOS Simulator,id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO test
 
       - name: Compile generated iOS host
-        run: xcodebuild -project capacitor/tessera-mrz/example-app/ios/App/App.xcodeproj -scheme App -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+        run: xcodebuild -project capacitor/tessera-mrz/example-app/ios/App/App.xcodeproj -scheme App -destination "platform=iOS Simulator,id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO build
 
   # The enforcement hooks in .claude/settings.json are code and regress like code
   # (known-pitfalls: "the hook itself needs regression tests"). Their test scripts are

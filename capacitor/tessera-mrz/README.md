@@ -34,6 +34,17 @@ does not change the API 24 runtime minimum. The tested Android host toolchain is
 9.2.1 with Gradle 9.6.1; Tessera's Kotlin 2.4 and current Compose dependencies cannot
 be consumed by Capacitor 8's older generated AGP default. The example preparation
 script upgrades both host files deterministically.
+Because AGP 9's built-in Kotlin compiler is older than Tessera 0.5's Kotlin 2.4
+metadata, Android hosts must temporarily opt out in `gradle.properties`:
+
+```properties
+android.builtInKotlin=false
+android.newDsl=false
+```
+
+The plugin applies Kotlin 2.4 itself. The example preparation script adds both
+properties automatically. This compatibility override can be removed once AGP's
+built-in compiler can consume Kotlin 2.4 metadata.
 
 On Android, the adapter requests camera permission through Capacitor, presents
 Tessera's Compose scanner in a private activity, prevents concurrent sessions, and

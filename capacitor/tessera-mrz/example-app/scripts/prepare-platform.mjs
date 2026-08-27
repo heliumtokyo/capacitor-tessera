@@ -31,6 +31,8 @@ if (platform === 'android') {
     'distributionSha256Sum',
     '9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14',
   );
+  setGradleProperty('android/gradle.properties', 'android.builtInKotlin', 'false');
+  setGradleProperty('android/gradle.properties', 'android.newDsl', 'false');
   replaceInFile(
     'android/app/build.gradle',
     /getDefaultProguardFile\('proguard-android(?:-optimize)?\.txt'\)/,
