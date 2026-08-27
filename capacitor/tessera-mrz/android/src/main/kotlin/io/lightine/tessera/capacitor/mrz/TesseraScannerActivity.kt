@@ -27,7 +27,10 @@ class TesseraScannerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         request = ScanRequest.from(intent)
-        activeActivity = WeakReference(this)
+        if (registerAndConsumeCancellation(this)) {
+            finishCancelled()
+            return
+        }
 
         setContent {
             var sessionKey by remember { mutableIntStateOf(0) }
@@ -63,9 +66,7 @@ class TesseraScannerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (activeActivity.get() === this) {
-            activeActivity.clear()
-        }
+        unregister(this)
         super.onDestroy()
     }
 
@@ -104,12 +105,42 @@ class TesseraScannerActivity : ComponentActivity() {
         const val EXTRA_RESULT_JSON = "resultJson"
         const val EXTRA_ERROR_CODE = "errorCode"
 
+        private val cancellationLock = Any()
         private var activeActivity: WeakReference<TesseraScannerActivity> = WeakReference(null)
+        private var pendingCancellation: Boolean = false
 
-        fun cancelActive(): Boolean {
-            val activity = activeActivity.get() ?: return false
+        fun cancelActiveOrNext(): Boolean {
+            val activity =
+                synchronized(cancellationLock) {
+                    activeActivity.get().also {
+                        if (it == null) pendingCancellation = true
+                    }
+                }
+            if (activity == null) {
+                return false
+            }
             activity.runOnUiThread { activity.finishCancelled() }
             return true
+        }
+
+        fun clearPendingCancellation() {
+            synchronized(cancellationLock) { pendingCancellation = false }
+        }
+
+        private fun registerAndConsumeCancellation(activity: TesseraScannerActivity): Boolean =
+            synchronized(cancellationLock) {
+                activeActivity = WeakReference(activity)
+                val pending = pendingCancellation
+                pendingCancellation = false
+                pending
+            }
+
+        private fun unregister(activity: TesseraScannerActivity) {
+            synchronized(cancellationLock) {
+                if (activeActivity.get() === activity) {
+                    activeActivity = WeakReference(null)
+                }
+            }
         }
     }
 }

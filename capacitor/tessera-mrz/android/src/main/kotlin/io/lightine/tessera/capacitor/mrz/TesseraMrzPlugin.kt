@@ -32,6 +32,7 @@ class TesseraMrzPlugin : Plugin() {
         }
 
         val request = parseRequest(call) ?: return
+        TesseraScannerActivity.clearPendingCancellation()
         activeScanCall = call
         cancelRequested = false
 
@@ -45,7 +46,7 @@ class TesseraMrzPlugin : Plugin() {
     @PluginMethod
     fun cancelScan(call: PluginCall) {
         val scanCall = activeScanCall
-        if (scanCall != null && !TesseraScannerActivity.cancelActive()) {
+        if (scanCall != null && !TesseraScannerActivity.cancelActiveOrNext()) {
             // Android's permission dialog belongs to the OS and cannot be dismissed by the plugin.
             // Resolve the pending scan as cancelled as soon as that dialog returns.
             cancelRequested = true
