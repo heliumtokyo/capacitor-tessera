@@ -187,14 +187,14 @@ enum MrzResultMapper {
     }
 
     private static func fieldName(_ field: MrzField) -> String {
-        if field === .documentType { return "document-type" }
-        if field === .issuingState { return "issuing-state" }
-        if field === .nameField { return "name" }
-        if field === .documentNumber { return "document-number" }
-        if field === .nationality { return "nationality" }
-        if field === .dateOfBirth { return "date-of-birth" }
-        if field === .dateOfExpiry { return "date-of-expiry" }
-        if field === .optionalData { return "optional-data" }
+        if field === MrzField.documentType { return "document-type" }
+        if field === MrzField.issuingState { return "issuing-state" }
+        if field === MrzField.nameField { return "name" }
+        if field === MrzField.documentNumber { return "document-number" }
+        if field === MrzField.nationality { return "nationality" }
+        if field === MrzField.dateOfBirth { return "date-of-birth" }
+        if field === MrzField.dateOfExpiry { return "date-of-expiry" }
+        if field === MrzField.optionalData { return "optional-data" }
         return "composite"
     }
 }

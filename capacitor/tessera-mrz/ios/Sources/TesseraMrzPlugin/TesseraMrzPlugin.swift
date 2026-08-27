@@ -77,7 +77,10 @@ public class TesseraMrzPlugin: CAPPlugin, CAPBridgedPlugin {
         case .authorized:
             presentScanner(request)
         case .notDetermined:
-            let callbackId = call.callbackId
+            guard let callbackId = call.callbackId else {
+                rejectActive("The scanner call has no callback identifier.", code: "INTERNAL_ERROR")
+                return
+            }
             AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
                 DispatchQueue.main.async {
                     self?.permissionRequestCompleted(callbackId: callbackId, granted: granted, request: request)

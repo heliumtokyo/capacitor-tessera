@@ -30,7 +30,10 @@ The iOS adapter uses Swift Package Manager. Camera access requires the host app 
 provide `NSCameraUsageDescription`; Android receives the required camera permission
 declaration from the plugin manifest. Android host applications must compile against
 API 37 or newer because Tessera's default Android UI has that compile-time floor; this
-does not change the API 24 runtime minimum.
+does not change the API 24 runtime minimum. The tested Android host toolchain is AGP
+9.2.1 with Gradle 9.6.1; Tessera's Kotlin 2.4 and current Compose dependencies cannot
+be consumed by Capacitor 8's older generated AGP default. The example preparation
+script upgrades both host files deterministically.
 
 On Android, the adapter requests camera permission through Capacitor, presents
 Tessera's Compose scanner in a private activity, prevents concurrent sessions, and

@@ -16,6 +16,21 @@ if (!existsSync(platform)) {
 run('cap', 'sync', platform);
 
 if (platform === 'android') {
+  replaceInFile(
+    'android/build.gradle',
+    /com\.android\.tools\.build:gradle:[\d.]+/,
+    'com.android.tools.build:gradle:9.2.1',
+  );
+  setGradleProperty(
+    'android/gradle/wrapper/gradle-wrapper.properties',
+    'distributionUrl',
+    'https\\://services.gradle.org/distributions/gradle-9.6.1-bin.zip',
+  );
+  setGradleProperty(
+    'android/gradle/wrapper/gradle-wrapper.properties',
+    'distributionSha256Sum',
+    '9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14',
+  );
   replaceInFile('android/variables.gradle', /compileSdkVersion\s*=\s*\d+/, 'compileSdkVersion = 37');
   replaceInFile('android/variables.gradle', /targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 37');
 } else {
@@ -49,6 +64,17 @@ function replaceInFile(path, pattern, replacement) {
   }
   pattern.lastIndex = 0;
   const updated = original.replace(pattern, replacement);
+  if (updated !== original) {
+    writeFileSync(path, updated);
+  }
+}
+
+function setGradleProperty(path, key, value) {
+  const original = readFileSync(path, 'utf8');
+  const pattern = new RegExp(`^${key}=.*$`, 'm');
+  const updated = pattern.test(original)
+    ? original.replace(pattern, `${key}=${value}`)
+    : `${original.trimEnd()}\n${key}=${value}\n`;
   if (updated !== original) {
     writeFileSync(path, updated);
   }
