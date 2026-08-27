@@ -21,6 +21,9 @@
 #
 # First-party actions only (GitHub + Gradle Foundation), matching check.yml's
 # supply-chain stance — no third-party scanner enters the build.
+# A fork with its dependency graph disabled cannot submit snapshots; skip this
+# upstream-only graph job there instead of spending the full resolution build
+# before GitHub rejects the upload.
 
 name: dependency submission
 
@@ -39,6 +42,7 @@ concurrency:
 jobs:
   dependency-submission:
     name: dependency graph
+    if: ${{ !github.event.repository.fork }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
