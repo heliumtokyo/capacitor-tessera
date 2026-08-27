@@ -1,0 +1,5 @@
+{
+  "appId": "io.lightine.tessera.capacitor.example",
+  "appName": "Tessera MRZ Example",
+  "webDir": "dist"
+}

@@ -18,6 +18,8 @@
 # issue-tracker item-5 update).
 #
 # First-party (GitHub) action only — consistent with check.yml's stance.
+# GitHub's dependency-review compare API returns 403 for fork repositories, so
+# forks skip this upstream gate and rely on their own ecosystem audit jobs.
 
 name: dependency review
 
@@ -31,6 +33,7 @@ permissions:
 jobs:
   dependency-review:
     name: dependency review
+    if: ${{ !github.event.repository.fork }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
