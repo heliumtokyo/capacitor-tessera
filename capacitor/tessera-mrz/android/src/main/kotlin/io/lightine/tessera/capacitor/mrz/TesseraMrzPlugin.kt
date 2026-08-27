@@ -10,11 +10,13 @@ import com.getcapacitor.JSObject
 import com.getcapacitor.PermissionState
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
+import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
 import com.getcapacitor.annotation.PermissionCallback
-import com.getcapacitor.annotation.PluginMethod
+
+private const val CAMERA_PERMISSION = "camera"
 
 @CapacitorPlugin(
     name = "TesseraMrz",
@@ -196,7 +198,6 @@ class TesseraMrzPlugin : Plugin() {
         }
 
     private companion object {
-        const val CAMERA_PERMISSION = "camera"
         val SUPPORTED_DOCUMENT_TYPES = setOf("passport", "id-card", "visa")
     }
 }
